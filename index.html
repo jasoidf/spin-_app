@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Wheel Spin 🎰</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;800&display=swap');
+
+    :root {
+      --gold: #FFD700;
+      --red: #e94560;
+      --dark: #0f0f1a;
+      --card: #1a1a2e;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      background: var(--dark);
+      font-family: 'Nunito', sans-serif;
+      color: white;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px 16px;
+      overflow-x: hidden;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    .header h1 {
+      font-family: 'Fredoka One', cursive;
+      font-size: 32px;
+      background: linear-gradient(135deg, var(--gold), #ff8c00);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: none;
+      letter-spacing: 1px;
+    }
+
+    .header p {
+      font-size: 14px;
+      opacity: 0.6;
+      margin-top: 4px;
+    }
+
+    .spin-count {
+      background: rgba(255,215,0,0.15);
+      border: 1px solid rgba(255,215,0,0.3);
+      border-radius: 20px;
+      padding: 6px 16px;
+      font-size: 13px;
+      margin-bottom: 20px;
+      color: var(--gold);
+    }
+
+    /* WHEEL CONTAINER */
+    .wheel-wrapper {
+      position: relative;
+      width: 300px;
+      height: 300px;
+      margin: 0 auto 30px;
+    }
+
+    /* Arrow pointer */
+    .pointer {
+      position: absolute;
+      top: -18px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 14px solid transparent;
+      border-right: 14px solid transparent;
+      border-top: 28px solid var(--gold);
+      filter: drop-shadow(0 2px 8px rgba(255,215,0,0.8));
+      z-index: 10;
+    }
+
+    canvas#wheel {
+      border-radius: 50%;
+      box-shadow:
+        0 0 0 6px #1e1e3a,
+        0 0 0 10px var(--gold),
+        0 0 40px rgba(255,215,0,0.3);
+    }
+
+    /* Center button on wheel */
+    .center-btn {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #ff6b35, var(--red));
+      border: 4px solid white;
+      color: white;
+      font-size: 10px;
+      font-weight: 800;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      box-shadow: 0 4px 20px rgba(233,69,96,0.6);
+      transition: transform 0.1s;
+      z-index: 10;
+      text-align: center;
+      line-height: 1.2;
+    }
+
+    .center-btn:active { transform: translate(-50%, -50%) scale(0.93); }
+    .center-btn span { font-size: 20px; }
+
+    /* SPIN BUTTON */
+    .spin-btn {
+      width: 100%;
+      max-width: 300px;
+      padding: 18px;
+      background: linear-gradient(135deg, #ff6b35, var(--red));
+      color: white;
+      border: none;
+      border-radius: 16px;
+      font-family: 'Fredoka One', cursive;
+      font-size: 22px;
+      letter-spacing: 1px;
+      cursor: pointer;
+      box-shadow: 0 8px 30px rgba(233,69,96,0.4);
+      transition: all 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .spin-btn:active { transform: scale(0.97); }
+    .spin-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .spin-btn::after {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: linear-gradient(transparent, rgba(255,255,255,0.1), transparent);
+      transform: rotate(30deg);
+      animation: shimmer 2s infinite;
+    }
+    @keyframes shimmer {
+      0% { transform: translateX(-100%) rotate(30deg); }
+      100% { transform: translateX(100%) rotate(30deg); }
+    }
+
+    /* RESULT MODAL */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(6px);
+    }
+    .modal-overlay.show { display: flex; }
+
+    .modal {
+      background: var(--card);
+      border: 2px solid var(--gold);
+      border-radius: 24px;
+      padding: 40px 32px;
+      text-align: center;
+      max-width: 320px;
+      width: 90%;
+      animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    @keyframes popIn {
+      from { transform: scale(0.5); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    .modal-emoji { font-size: 64px; margin-bottom: 12px; }
+    .modal-title {
+      font-family: 'Fredoka One', cursive;
+      font-size: 28px;
+      color: var(--gold);
+      margin-bottom: 8px;
+    }
+    .modal-prize {
+      font-size: 20px;
+      font-weight: 800;
+      margin-bottom: 20px;
+      color: white;
+    }
+    .modal-btn {
+      background: linear-gradient(135deg, var(--gold), #ff8c00);
+      color: #111;
+      border: none;
+      border-radius: 12px;
+      padding: 14px 32px;
+      font-family: 'Fredoka One', cursive;
+      font-size: 18px;
+      cursor: pointer;
+      width: 100%;
+    }
+
+    /* Confetti */
+    .confetti-piece {
+      position: fixed;
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      animation: confettiFall 3s ease-in forwards;
+      z-index: 200;
+    }
+    @keyframes confettiFall {
+      0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+      100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+    }
+
+    /* Prizes list */
+    .prizes-list {
+      background: var(--card);
+      border-radius: 16px;
+      padding: 16px;
+      margin-top: 20px;
+      width: 100%;
+      max-width: 300px;
+    }
+    .prizes-list h3 {
+      font-family: 'Fredoka One', cursive;
+      font-size: 16px;
+      color: var(--gold);
+      margin-bottom: 12px;
+      text-align: center;
+    }
+    .prize-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 0;
+      font-size: 13px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .prize-item:last-child { border-bottom: none; }
+    .prize-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🎰 WHEEL SPIN</h1>
+  <p>G'ildirakni aylantiring va sovg'a yuting!</p>
+</div>
+
+<div class="spin-count" id="spinCountBadge">🎟️ Sizda 1 ta urinish bor</div>
+
+<div class="wheel-wrapper">
+  <div class="pointer"></div>
+  <canvas id="wheel" width="300" height="300"></canvas>
+  <button class="center-btn" onclick="startSpin()">
+    <span>🎯</span>SPIN
+  </button>
+</div>
+
+<button class="spin-btn" id="spinBtn" onclick="startSpin()">
+  🎰 AYLANTIR!
+</button>
+
+<div class="prizes-list">
+  <h3>🏆 Sovg'alar</h3>
+  <div id="prizesList"></div>
+</div>
+
+<!-- Result Modal -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-emoji" id="modalEmoji">🎉</div>
+    <div class="modal-title">Tabriklaymiz!</div>
+    <div class="modal-prize" id="modalPrize">Sovg'a nomi</div>
+    <button class="modal-btn" onclick="closeModal()">✅ Qabul qilish</button>
+  </div>
+</div>
+
+<script>
+  // ===== Telegram WebApp init =====
+  const tg = window.Telegram?.WebApp;
+  if (tg) {
+    tg.ready();
+    tg.expand();
+  }
+
+  // ===== PRIZES =====
+  const prizes = [
+    { label: "50% Chegirma",  emoji: "🎫", color: "#e94560", probability: 25 },
+    { label: "100 Ball",       emoji: "⭐", color: "#4a90d9", probability: 20 },
+    { label: "Tekin Kofe",     emoji: "☕", color: "#8e5a3b", probability: 15 },
+    { label: "Katta Sovg'a!",  emoji: "🎁", color: "#27ae60", probability: 5  },
+    { label: "Yana 1 Urinish", emoji: "🔄", color: "#9b59b6", probability: 15 },
+    { label: "20% Chegirma",   emoji: "🏷️", color: "#f39c12", probability: 20 },
+  ];
+
+  // ===== STATE =====
+  let spinning = false;
+  let currentAngle = 0;
+  let spinsLeft = 1;
+
+  // ===== CANVAS DRAW =====
+  const canvas = document.getElementById("wheel");
+  const ctx = canvas.getContext("2d");
+  const cx = canvas.width / 2;
+  const cy = canvas.height / 2;
+  const radius = cx - 4;
+  const arc = (2 * Math.PI) / prizes.length;
+
+  function drawWheel(rotation = 0) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    prizes.forEach((prize, i) => {
+      const start = rotation + i * arc - Math.PI / 2;
+      const end   = start + arc;
+
+      // Slice
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, radius, start, end);
+      ctx.closePath();
+      ctx.fillStyle = prize.color;
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.15)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Text
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(start + arc / 2);
+      ctx.textAlign = "right";
+      ctx.fillStyle = "white";
+      ctx.font = "bold 13px Nunito, sans-serif";
+      ctx.shadowColor = "rgba(0,0,0,0.5)";
+      ctx.shadowBlur = 3;
+      ctx.fillText(prize.emoji + " " + prize.label, radius - 10, 5);
+      ctx.restore();
+    });
+
+    // Center circle
+    ctx.beginPath();
+    ctx.arc(cx, cy, 30, 0, Math.PI * 2);
+    ctx.fillStyle = "#1a1a2e";
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,215,0,0.4)";
+    ctx.lineWidth = 3;
+    ctx.stroke();
+  }
+
+  // Build prizes list
+  function buildPrizeList() {
+    const el = document.getElementById("prizesList");
+    el.innerHTML = prizes.map(p => `
+      <div class="prize-item">
+        <div class="prize-dot" style="background:${p.color}"></div>
+        <span>${p.emoji} ${p.label}</span>
+      </div>
+    `).join("");
+  }
+
+  // ===== WEIGHTED RANDOM =====
+  function getResult() {
+    const total = prizes.reduce((s, p) => s + p.probability, 0);
+    let r = Math.random() * total;
+    for (let i = 0; i < prizes.length; i++) {
+      r -= prizes[i].probability;
+      if (r <= 0) return i;
+    }
+    return prizes.length - 1;
+  }
+
+  // ===== SPIN =====
+  function startSpin() {
+    if (spinning || spinsLeft <= 0) return;
+    spinning = true;
+    document.getElementById("spinBtn").disabled = true;
+
+    const winIndex = getResult();
+    const sliceAngle = (2 * Math.PI) / prizes.length;
+    // Target angle: bring winning slice to top (pointer position)
+    const targetSliceCenter = (winIndex + 0.5) * sliceAngle;
+    const fullSpins = (Math.PI * 2) * (5 + Math.floor(Math.random() * 3));
+    const targetAngle = currentAngle + fullSpins + (Math.PI * 2 - targetSliceCenter - currentAngle % (Math.PI * 2) + Math.PI / 2) % (Math.PI * 2);
+
+    const duration = 4000;
+    const startTime = performance.now();
+    const startAngle = currentAngle;
+
+    function animate(now) {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      // Ease out cubic
+      const ease = 1 - Math.pow(1 - progress, 3);
+      currentAngle = startAngle + (targetAngle - startAngle) * ease;
+
+      drawWheel(currentAngle);
+
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        currentAngle = targetAngle;
+        spinning = false;
+        spinsLeft--;
+        updateSpinCount();
+        showResult(prizes[winIndex]);
+        // Send to Telegram
+        if (tg) {
+          tg.sendData(JSON.stringify({ prize: prizes[winIndex].label, emoji: prizes[winIndex].emoji }));
+        }
+      }
+    }
+
+    requestAnimationFrame(animate);
+  }
+
+  function updateSpinCount() {
+    const badge = document.getElementById("spinCountBadge");
+    if (spinsLeft > 0) {
+      badge.textContent = `🎟️ Sizda ${spinsLeft} ta urinish bor`;
+    } else {
+      badge.textContent = "⏰ Urinishlar tugadi";
+      document.getElementById("spinBtn").disabled = true;
+    }
+  }
+
+  // ===== RESULT =====
+  function showResult(prize) {
+    document.getElementById("modalEmoji").textContent = prize.emoji;
+    document.getElementById("modalPrize").textContent = prize.label;
+    document.getElementById("modal").classList.add("show");
+    launchConfetti();
+  }
+
+  function closeModal() {
+    document.getElementById("modal").classList.remove("show");
+  }
+
+  // ===== CONFETTI =====
+  function launchConfetti() {
+    const colors = ["#FFD700","#e94560","#4a90d9","#27ae60","#9b59b6","#f39c12"];
+    for (let i = 0; i < 60; i++) {
+      const el = document.createElement("div");
+      el.className = "confetti-piece";
+      el.style.cssText = `
+        left: ${Math.random() * 100}vw;
+        top: -10px;
+        background: ${colors[Math.floor(Math.random() * colors.length)]};
+        width: ${6 + Math.random() * 8}px;
+        height: ${6 + Math.random() * 8}px;
+        animation-delay: ${Math.random() * 1}s;
+        animation-duration: ${2 + Math.random() * 2}s;
+      `;
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 4000);
+    }
+  }
+
+  // ===== INIT =====
+  drawWheel(0);
+  buildPrizeList();
+</script>
+</body>
+</html>
